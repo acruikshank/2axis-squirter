@@ -1,0 +1,124 @@
+<html>
+  <head>
+    <title>2 axis controller</title>
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name = "viewport" content = "width = device-width,
+       initial-scale = 1, user-scalable = yes">
+
+    <style>
+      html { height: 100%; }
+      body { background-color: #cccccc; height: 100%; margin: 0; }
+      canvas { width: 100px; height: 100px; margin: 50px 0 0 40px; }
+      canvas:first-child { margin-right: 40px; }
+      button { position: absolute; bottom: 50px; left: 50%; height: 50px; width: 100px; margin-left: -50px; }
+      #target { height: 80%; margin: 0; }
+      #connected {
+        background-color: black;
+        width: 30px;
+        height: 20px;
+        position: absolute;
+        top: 85px;
+        left: 50%;
+        margin-left: -15px;
+      }
+      #connected.connected {
+        background-color: green;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="target">
+      <canvas id="alpha"></canvas>
+      <canvas id="beta"></canvas>
+      <div id="connected"></div>
+    </div>
+    <button id="reset">reset</button>
+  </body>
+  <script>
+    var wsURL = 'ws://' + location.host + '/ws';
+    var ws, alphaOffset, betaOffset, connected = false;
+    var A = 1;
+    var B = 1;
+    var squirting = -1;
+
+    window.addEventListener("deviceorientation", handleOrientation, true);
+    document.getElementById('target').addEventListener('touchstart', function() { squirting=1; })
+    document.getElementById('target').addEventListener('touchend', function() { squirting=-1; })
+    document.getElementById('reset').addEventListener('click', reset);
+
+    reset();
+
+    var ctxs = {};
+    for (var i=0, p; p = ['alpha','beta'][i]; i++) {
+      var canvas = document.getElementById(p);
+      canvas.width = canvas.offsetWidth;
+      canvas.height = canvas.offsetHeight;
+      ctxs[p] = canvas.getContext('2d');
+    }
+
+    function reset(e) {
+      if (e) e.preventDefault();
+      if (ws) ws.close();
+      connected = false;
+      ws = new WebSocket(wsURL);
+      ws.onopen = function() {
+        connected = true;
+        document.getElementById('connected').setAttribute('class','connected');
+      }
+      ws.onclose = function() {
+        connected = false;
+        document.getElementById('connected').setAttribute('class','');
+      }
+      alphaOffset = null;
+      betaOffset = null;
+      return false;
+    }
+
+    function clamp(x, mn, mx) { return Math.min(mx, Math.max(mn, x)); }
+
+    function handleOrientation(event) {
+      if (!connected)
+        return;
+
+      if (alphaOffset == null) {
+        alphaOffset = event.alpha;
+        betaOffset = event.beta;
+      }
+
+      var alpha = 90 + A*(event.alpha - alphaOffset);
+      while (alpha > 360) alpha -= 360;
+      while (alpha < 0) alpha += 360;
+      var beta = 60 + B*(event.beta - betaOffset);
+      while (beta > 360) beta -= 360;
+      while (beta < 0) beta += 360;
+
+      ws.send(new Float32Array([
+        clamp(alpha, 45, 135),
+        clamp(beta, 20, 100),
+        squirting
+      ]));
+
+      for (var i=0, p; p = ['alpha','beta'][i]; i++) {
+        var ctx = ctxs[p];
+        ctx.clearRect(0,0,ctx.canvas.width,ctx.canvas.height);
+
+        var R = ctx.canvas.width/2;
+        var cx = ctx.canvas.width/2, cy = ctx.canvas.height/2;
+        var angle = -Math.PI * event[p] / 180;
+
+        ctx.fillStyle = '#ddd';
+        ctx.beginPath();
+        ctx.arc(cx, cy, R, 0, 2*Math.PI, true);
+        ctx.fill();
+
+        ctx.strokeStyle = '#ff0';
+        ctx.lineWidth = 8;
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + R*Math.cos(angle), cy + R*Math.sin(angle));
+        ctx.stroke();
+      }
+    }
+  </script>
+</html>
