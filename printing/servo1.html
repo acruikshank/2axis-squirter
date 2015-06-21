@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <title>Servo 1</title>
+    <meta charset="utf-8">
+    <style>
+      body {
+        margin: 0px;
+        background-color: #999999;
+        overflow: hidden;
+      }
+
+      #buttons {
+        position: absolute;
+        top:5px;
+        left:5px;
+      }
+    </style>
+    <script src="FileSaver.js"></script>
+    <script src="three.min.js"></script>
+    <script src="csg.js"></script>
+    <script src="orbit_controls.js"></script>
+    <script src="ThreeCSG.js"></script>
+    <script src="cad.js"></script>
+    <script src="manifold.js"/></script>
+  </head>
+  <body>
+    <div id="buttons"></div>
+    <script>
+
+var PREPARE_FOR_PRINTING = true;
+var CYLINDER_QUALITY = PREPARE_FOR_PRINTING ? 50 : 20;
+
+var PART_TOLERANCE = .1;
+
+var BASE_WIDTH = 24;
+var BASE_THICKNESS = 1;
+var HOLE_DIAMETER = 15.5;
+var SERVO_INNER = 40.5;
+var SERVO_OUTER = 57;
+var SERVO_WIDTH = 20;
+var SERVO_HOLE_CENTER = 48.5;
+var SERVO_HOLE_DIAMETER = 4.5;
+var SERVO_HOLE_OFFSET = 10;
+var SERVO_HOLDER_DEPTH = 4;
+
+a3d.cad.init();
+addGeometry();
+a3d.cad.render();
+
+function addGeometry() {
+
+  var M = manifold;
+
+
+  // var base = CSG.cube({
+  //   center: [0, 0, 0],
+  //   radius: [BASE_WIDTH/2, BASE_WIDTH/2, BASE_THICKNESS]
+  // })
+
+  // .subtract(CSG.cylinder({
+  //   start:[0, 0, -2*BASE_THICKNESS],
+  //   end:[0, 0, 2*BASE_THICKNESS],
+  //   radius: HOLE_DIAMETER/2,
+  //   slices: CYLINDER_QUALITY
+  // }))
+
+  // var geometry = THREE.CSG.fromCSG(base);
+
+  var holder = M.CSGRenderer();
+
+  var spine = M.Path([0,0,0]).line([0,0,SERVO_HOLDER_DEPTH]);
+  M.PathParameterized(spine, 8, 20)
+  ( function(profile) {
+      return M.Path([-BASE_WIDTH/2,-BASE_WIDTH/2,profile.z])
+        .line([-BASE_WIDTH/2,0,profile.z])
+        .line([-SERVO_OUTER/2,0,profile.z])
+        .line([-SERVO_OUTER/2,BASE_WIDTH/2 + SERVO_WIDTH,profile.z],1)
+        .line([-SERVO_INNER/2,BASE_WIDTH/2 + SERVO_WIDTH,profile.z],1)
+        .line([-SERVO_INNER/2,BASE_WIDTH/2,profile.z],1)
+        .line([SERVO_INNER/2,BASE_WIDTH/2,profile.z],1)
+        .line([SERVO_INNER/2,BASE_WIDTH/2 + SERVO_WIDTH,profile.z],1)
+        .line([SERVO_OUTER/2,BASE_WIDTH/2 + SERVO_WIDTH,profile.z],1)
+        .line([SERVO_OUTER/2,0,profile.z],1)
+        .line([BASE_WIDTH/2,0,profile.z],1)
+        .line([BASE_WIDTH/2,-BASE_WIDTH/2,profile.z],1)
+    }
+  )
+  ( M.facers( M.skin, M.closeEdge, M.capBottom, M.capTop )
+    ( holder.renderer )
+  );
+
+  var holderObj = holder.csgObject();
+  for (var i=-1;i<2;i+=2) for (var j=-1;j<2;j+=2)
+    holderObj = holderObj.subtract(CSG.cylinder({
+      start:[i*SERVO_HOLE_CENTER/2, BASE_WIDTH/2 + (SERVO_WIDTH-j*SERVO_HOLE_OFFSET)/2, -2*SERVO_HOLDER_DEPTH],
+      end:[i*SERVO_HOLE_CENTER/2, BASE_WIDTH/2 + (SERVO_WIDTH-j*SERVO_HOLE_OFFSET)/2, 2*SERVO_HOLDER_DEPTH],
+      radius: SERVO_HOLE_DIAMETER/2,
+      slices: CYLINDER_QUALITY
+    }))
+
+  holderObj = holderObj.subtract(CSG.cylinder({
+    start:[0, 0, -2*SERVO_HOLDER_DEPTH],
+    end:[0, 0, 2*SERVO_HOLDER_DEPTH],
+    radius: HOLE_DIAMETER/2,
+    slices: CYLINDER_QUALITY
+  }))
+
+
+  var geometry = THREE.CSG.fromCSG(holderObj);
+  // THREE.GeometryUtils.merge(trapGeometry, dishGeometry)
+  addMesh( geometry, '#ffffff', 'connector1');
+}
+
+function addMesh( geometry, color, name ) {
+  var material = new THREE.MeshPhongMaterial( { color: color } );
+  var mesh = new THREE.Mesh(geometry, material );
+  a3d.cad.addMesh(mesh, name, {edge: .1})
+}
+
+function translateGeometry( g, x, y, z ) {
+  matrix = new THREE.Matrix4().makeTranslation(x,y,z);
+  g.applyMatrix(matrix);
+}
+function rotateGeometry( g, x, y, z ) {
+  var matrix;
+  if (x)
+    matrix = new THREE.Matrix4().makeRotationX(x);
+  if (y)
+    matrix = (matrix||new THREE.Matrix4()).makeRotationY(y);
+  if (z)
+    matrix = (matrix||new THREE.Matrix4()).makeRotationZ(z);
+  if (matrix)
+    g.applyMatrix(matrix);
+}
+function scaleGeometry( g, x, y, z ) {
+  matrix = new THREE.Matrix4().makeScale(x,y,z);
+  g.applyMatrix(matrix);
+}
+
+    </script>
+  </body>
+</html>
