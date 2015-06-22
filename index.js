@@ -19,7 +19,6 @@ app.ws('/ws', function(ws) {
       else
         relay.high();
     }
-
   });
 });
 
